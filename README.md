@@ -31,7 +31,7 @@ The CI workflow repeats both commands.
 
 - Versions are frozen dataclasses so a test can prove promotion does not rewrite history.
 - The responder is an argument so a later swap to a real model client does not change the harness.
-- Drift bins span the combined min and max. A constant window has PSI 0. Empty bins use a 0.001 floor before the shares are normalized, so the log is defined.
+- Drift bins span the combined min and max. PSI is 0 when every score in both windows is the same value. Empty bins use a 0.001 floor before the shares are normalized, so the log is defined.
 
 ## Limits
 
