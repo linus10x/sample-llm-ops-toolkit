@@ -31,6 +31,29 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(score_case("nope", "90 days", mode="exact"), 0.0)
         self.assertGreater(score_case("kept for 90 days", "90 days", mode="f1"), 0.4)
 
+    def test_token_f1_counts_shared_tokens(self):
+        score = score_case("kept for 90 days", "90 days", mode="f1")
+        self.assertAlmostEqual(score, 2 / 3)
+
+    def test_harness_forwards_exact_mode(self):
+        def responder(template, variables):
+            return variables["text"]
+
+        prompt = PromptRegistry().add("note", "template {text}")
+        report = EvalHarness(responder).run(
+            prompt,
+            [
+                {
+                    "id": "loose",
+                    "variables": {"text": "kept for 90 days"},
+                    "expected": "90 days",
+                    "mode": "exact",
+                }
+            ],
+        )
+        self.assertEqual(report.results[0].output, "kept for 90 days")
+        self.assertEqual(report.results[0].score, 0.0)
+
     def test_harness_mean_on_local_responder(self):
         reg = PromptRegistry()
         prompt = reg.add("note", "Window: {hours}.")
@@ -85,6 +108,11 @@ class DriftTests(unittest.TestCase):
         self.assertTrue(report.alert)
         self.assertLess(report.mean_shift, 0)
 
+    def test_shifted_window_psi_uses_bins_and_floor(self):
+        report = compare([0.9, 0.95, 1.0, 0.92], [0.1, 0.2, 0.0, 0.15])
+        self.assertAlmostEqual(report.psi, 13.1877, places=4)
+        self.assertAlmostEqual(report.mean_shift, -0.83)
+
     def test_psi_zero_when_constant(self):
         self.assertEqual(population_stability([0.5, 0.5], [0.5, 0.5]), 0.0)
 
@@ -99,6 +127,13 @@ class CostTests(unittest.TestCase):
         with self.assertRaises(CostError):
             mon.record("2026-10-16", "missing", 1, 1)
         self.assertEqual(mon.by_model("2026-10-16")["sample-local"], 2.0)
+
+    def test_price_table_input_and_output(self):
+        mon = CostMonitor()
+        mon.record("2026-10-16", "sample-large", 1_000_000, 0)
+        mon.record("2026-10-16", "sample-local", 0, 1_000_000)
+        self.assertEqual(mon.by_model("2026-10-16")["sample-large"], 15.0)
+        self.assertEqual(mon.by_model("2026-10-16")["sample-local"], 8.0)
 
 
 if __name__ == "__main__":
