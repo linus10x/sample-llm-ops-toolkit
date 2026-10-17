@@ -41,6 +41,34 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(report.mean, 1.0)
         self.assertEqual(report.prompt_version, 1)
 
+    def test_harness_scores_injected_responder_output(self):
+        def responder(template, variables):
+            return variables["text"]
+
+        prompt = PromptRegistry().add("note", "template {text}")
+        report = EvalHarness(responder).run(
+            prompt,
+            [
+                {
+                    "id": "hit",
+                    "variables": {"text": "kept for 90 days"},
+                    "expected": "90 days",
+                    "mode": "contains",
+                },
+                {
+                    "id": "miss",
+                    "variables": {"text": "nope"},
+                    "expected": "90 days",
+                    "mode": "contains",
+                },
+            ],
+        )
+        self.assertEqual(report.results[0].output, "kept for 90 days")
+        self.assertEqual(report.results[0].score, 1.0)
+        self.assertEqual(report.results[1].output, "nope")
+        self.assertEqual(report.results[1].score, 0.0)
+        self.assertEqual(report.mean, 0.5)
+
     def test_missing_slot_raises(self):
         with self.assertRaises(KeyError):
             LocalResponder()("Window: {hours}.", {})
